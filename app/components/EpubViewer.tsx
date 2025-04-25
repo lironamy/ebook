@@ -327,14 +327,6 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     }
   };
 
-  const scrollToTop = () => {
-    const iframe = document.querySelector('iframe');
-    if (iframe?.contentDocument?.body) {
-      iframe.contentDocument.body.scrollTop = 0;
-      iframe.contentDocument.documentElement.scrollTop = 0;
-    }
-  };
-
   useEffect(() => {
     const iframe = document.querySelector('iframe');
     if (iframe?.contentDocument?.body) {
@@ -559,19 +551,3 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
   );
 }
 
-function PlayIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="5 3 19 12 5 21 5 3"></polygon>
-    </svg>
-  );
-}
-
-function PauseIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="6" y="4" width="4" height="16"></rect>
-      <rect x="14" y="4" width="4" height="16"></rect>
-    </svg>
-  );
-}
