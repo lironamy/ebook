@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1" xml:lang="en">
+  <head>
+    <meta name="dtb:uid" content="9a446ff3-c8c9-4d86-86f0-41549802319b"/>
+    <meta name="dtb:depth" content="2"/>
+    <meta name="dtb:generator" content="calibre (6.13.0)"/>
+    <meta name="dtb:totalPageCount" content="0"/>
+    <meta name="dtb:maxPageNumber" content="0"/>
+  </head>
+  <docTitle>
+    <text>blood of christ, mountain stream</text>
+  </docTitle>
+  <navMap>
+    <navPoint id="unQoIvFD3AARTnf9XklGNy6" playOrder="1">
+      <navLabel>
+        <text>Preface</text>
+      </navLabel>
+      <content src="blood_of_christ_mountain_split_000.xhtml"/>
+    </navPoint>
+    <navPoint id="uMqJV3HkmgLc5ypBYSIOtmE" playOrder="2">
+      <navLabel>
+        <text>Chapter 1</text>
+      </navLabel>
+      <content src="blood_of_christ_mountain_split_002.xhtml"/>
+    </navPoint>
+    <navPoint id="uIpoBa8sYoPKklTpZgXcFJA" playOrder="3">
+      <navLabel>
+        <text>Chapter 2</text>
+      </navLabel>
+      <content src="blood_of_christ_mountain_split_003.xhtml"/>
+    </navPoint>
+    <navPoint id="u2TX4ealTsNYD74djDhSGG5" playOrder="4">
+      <navLabel>
+        <text>Afterword</text>
+      </navLabel>
+      <content src="blood_of_christ_mountain_split_004.xhtml"/>
+    </navPoint>
+  </navMap>
+</ncx>

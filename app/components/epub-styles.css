@@ -1,0 +1,31 @@
+/* Styles for the epub reader iframe content */
+:root {
+  --reader-bg: #fff;
+  --reader-text: #333;
+  --reader-line-height: 1.6;
+  --reader-font-size: 1.2rem;
+}
+
+/* Hide horizontal scrollbar */
+::-webkit-scrollbar-horizontal {
+  display: none;
+}
+
+/* Style vertical scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

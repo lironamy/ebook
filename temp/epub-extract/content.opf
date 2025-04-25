@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="uuid_id">
+  <metadata xmlns:opf="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:calibre="http://calibre.kovidgoyal.net/2009/metadata">
+    <dc:title>blood of christ, mountain stream</dc:title>
+    <meta name="calibre:timestamp" content="2025-04-25T00:07:31.022746+00:00"/>
+    <dc:language>en</dc:language>
+    <dc:creator opf:file-as="seabiscuit" opf:role="aut">seabiscuit</dc:creator>
+    <dc:identifier id="uuid_id" opf:scheme="uuid">9a446ff3-c8c9-4d86-86f0-41549802319b</dc:identifier>
+    <meta name="calibre:title_sort" content="blood of christ, mountain stream"/>
+    <dc:description>&lt;p&gt;“I’d give her two weeks. Maybe a month. An uncomfortable month. Or, I take her back to Philadelphia, give her a good meal, a snuggle, and an easy death, and she becomes a part of research that will better humanity. Not bad for a calf born in bumfuck, Pennsylvania.”&lt;/p&gt;&lt;p&gt;“What do they call you at your lab,” Rio asked. She was standing with her hands on her hips and a wrinkle in her brow, “‘The Closer’, something like that?”&lt;/p&gt;&lt;p&gt;“I want that calf,” Agatha said, her voice measured, even, “And the only thing standing between her and me right now is you."&lt;/p&gt;&lt;p&gt;or,&lt;/p&gt;&lt;p&gt;After a calf with a rare congenital abnormality is born on an area farm, Agatha, a researcher, goes to collect. Unfortunately, the calf's owner is not exactly keen on giving her up.&lt;/p&gt;</dc:description>
+    <dc:publisher>Archive of Our Own</dc:publisher>
+    <dc:subject>Fanworks</dc:subject>
+    <dc:subject>Explicit</dc:subject>
+    <dc:subject>Agatha All Along (TV)</dc:subject>
+    <dc:subject>Agatha Harkness/Rio Vidal</dc:subject>
+    <dc:subject>Agatha Harkness</dc:subject>
+    <dc:subject>Rio Vidal</dc:subject>
+    <dc:subject>William Kaplan (Agatha All Along)</dc:subject>
+    <dc:subject>Lilia Calderu</dc:subject>
+    <dc:subject>Jennifer Kale</dc:subject>
+    <dc:subject>enemies to scissoring on a futon</dc:subject>
+    <dc:subject>as is my way</dc:subject>
+    <dc:subject>author has written a two headed calf au for reasons known only to them</dc:subject>
+    <dc:subject>this is the second story i've written that takes place in central pennsylvania in the late 1990's</dc:subject>
+    <dc:subject>but they are almost 10 years apart so i am choosing believe that it says nothing about me as a person</dc:subject>
+    <dc:subject>F/F</dc:subject>
+    <dc:subject>Choose Not To Use Archive Warnings</dc:subject>
+    <dc:date>2025-04-24T00:00:00+00:00</dc:date>
+  </metadata>
+  <manifest>
+    <item id="html5" href="blood_of_christ_mountain_split_000.xhtml" media-type="application/xhtml+xml"/>
+    <item id="html4" href="blood_of_christ_mountain_split_001.xhtml" media-type="application/xhtml+xml"/>
+    <item id="html3" href="blood_of_christ_mountain_split_002.xhtml" media-type="application/xhtml+xml"/>
+    <item id="html2" href="blood_of_christ_mountain_split_003.xhtml" media-type="application/xhtml+xml"/>
+    <item id="html1" href="blood_of_christ_mountain_split_004.xhtml" media-type="application/xhtml+xml"/>
+    <item id="page_css" href="page_styles.css" media-type="text/css"/>
+    <item id="css" href="stylesheet.css" media-type="text/css"/>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+  </manifest>
+  <spine toc="ncx">
+    <itemref idref="html5"/>
+    <itemref idref="html4"/>
+    <itemref idref="html3"/>
+    <itemref idref="html2"/>
+    <itemref idref="html1"/>
+  </spine>
+</package>
