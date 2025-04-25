@@ -4,22 +4,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { ReactReader } from 'react-reader';
 import { extractEpubFromBlob } from '../utils/epub';
 import './epub-styles.css';
+import type { Rendition } from 'epubjs';
 
 interface EpubViewerProps {
   url: string;
   onTextExtracted?: (text: string) => void;
-}
-
-interface Voice {
-  name: string;
-  voice: SpeechSynthesisVoice;
-}
-
-interface TextNode {
-  node: Text;
-  text: string;
-  start: number;
-  end: number;
 }
 
 export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
@@ -28,43 +17,180 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [epubData, setEpubData] = useState<ArrayBuffer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [voices, setVoices] = useState<Voice[]>([]);
-  const [selectedVoice, setSelectedVoice] = useState<Voice | null>(null);
   const [speechRate, setSpeechRate] = useState(1.0);
-  const [pausedPosition, setPausedPosition] = useState<number>(0);
   const currentCharIndexRef = useRef<number>(0);
   const lastWordIndexRef = useRef<number>(0);
-  const renditionRef = useRef<any>(null);
+  const renditionRef = useRef<Rendition | undefined>(undefined);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const readerRef = useRef<any>(null);
-  const textNodesRef = useRef<TextNode[]>([]);
+  const readerRef = useRef<Rendition | undefined>(undefined);
   const highlightSpanRef = useRef<HTMLSpanElement | null>(null);
   const currentTextRef = useRef<string>('');
   const isManuallyPaused = useRef<boolean>(false);
 
-  // Load available voices
-  useEffect(() => {
-    const loadVoices = () => {
-      const availableVoices = window.speechSynthesis.getVoices();
-      const ziraVoice = availableVoices.find(voice => 
+  const removeHighlight = useCallback(() => {
+    if (highlightSpanRef.current?.parentNode) {
+      const text = highlightSpanRef.current.textContent;
+      const textNode = document.createTextNode(text || '');
+      highlightSpanRef.current.parentNode.replaceChild(textNode, highlightSpanRef.current);
+      highlightSpanRef.current = null;
+    }
+  }, []);
+
+  const stopSpeech = useCallback(() => {
+    if (speechRef.current) {
+      // Store the current position when manually paused
+      if (isManuallyPaused.current) {
+        // Removed pausedPosition state
+      }
+      
+      speechRef.current.onend = null;
+      speechRef.current.onboundary = null;
+      speechRef.current.onerror = null;
+    }
+    window.speechSynthesis.cancel();
+    removeHighlight();
+    setIsPlaying(false);
+  }, [removeHighlight]);
+
+  const highlightCurrentWord = useCallback((text: string, charIndex: number) => {
+    removeHighlight();
+
+    try {
+      const iframe = document.querySelector('iframe');
+      if (!iframe?.contentDocument?.body) return;
+
+      // Find the text node containing this character index
+      let currentPos = 0;
+      let foundNode: Text | null = null;
+      let foundStart = 0;
+
+      const walker = document.createTreeWalker(
+        iframe.contentDocument.body,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+
+      let node: Text | null;
+      
+      while ((node = walker.nextNode() as Text)) {
+        const textContent = node.textContent || '';
+        if (charIndex >= currentPos && charIndex < currentPos + textContent.length) {
+          foundNode = node;
+          foundStart = charIndex - currentPos;
+          break;
+        }
+        currentPos += textContent.length;
+      }
+
+      if (foundNode) {
+        const range = iframe.contentDocument.createRange();
+        range.setStart(foundNode, foundStart);
+        range.setEnd(foundNode, foundStart + 1);
+
+        const span = iframe.contentDocument.createElement('span');
+        span.style.backgroundColor = '#ffeb3b';
+        span.style.color = '#000';
+        
+        range.surroundContents(span);
+        highlightSpanRef.current = span;
+      }
+    } catch (err) {
+      console.error('Error highlighting word:', err);
+    }
+  }, [removeHighlight]);
+
+  const startSpeech = useCallback(async () => {
+    const text = await getCurrentPageText();
+    if (!text) return;
+
+    // Reset manual pause flag when starting new speech
+    isManuallyPaused.current = false;
+
+    // Create a new utterance
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = speechRate;
+
+    // Set the voice if one is selected
+    if (window.speechSynthesis.getVoices().length > 0) {
+      const ziraVoice = window.speechSynthesis.getVoices().find(voice => 
         voice.name === 'Microsoft Zira - English (United States)' && 
         voice.lang === 'en-US'
       );
-      
       if (ziraVoice) {
-        setSelectedVoice({
-          name: ziraVoice.name,
-          voice: ziraVoice
+        utterance.voice = ziraVoice;
+      }
+    }
+
+    // Handle speech end
+    utterance.onend = () => {
+      removeHighlight();
+      // Only proceed if we're still in playing state and not manually paused
+      if (isPlaying && !isManuallyPaused.current && renditionRef.current) {
+        // Try to move to next page
+        renditionRef.current.next().then(() => {
+          // Check if we're at the end of the book
+          if (!renditionRef.current) {
+            setIsPlaying(false);
+          }
         });
       }
     };
 
-    // Chrome loads voices asynchronously
-    if (typeof window !== 'undefined') {
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-      loadVoices(); // Initial load
+    // Handle word boundaries for highlighting
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        currentCharIndexRef.current = event.charIndex;
+        lastWordIndexRef.current = event.charIndex;
+        highlightCurrentWord(text, event.charIndex);
+      }
+    };
+
+    // Handle errors
+    utterance.onerror = (event) => {
+      if (event.error !== 'interrupted' || !isManuallyPaused.current) {
+        console.error('Speech synthesis error:', event);
+        setIsPlaying(false);
+      }
+    };
+
+    // Store the utterance and start speaking
+    speechRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+    setIsPlaying(true);
+  }, [speechRate, isPlaying, removeHighlight, highlightCurrentWord]);
+
+  const toggleSpeech = useCallback(() => {
+    if (isPlaying) {
+      isManuallyPaused.current = true;
+      stopSpeech();
+    } else {
+      startSpeech();
     }
-  }, []);
+  }, [isPlaying, stopSpeech, startSpeech]);
+
+  const handleTextClick = useCallback((event: MouseEvent) => {
+    const iframe = document.querySelector('iframe');
+    if (!iframe?.contentDocument?.body) return;
+
+    const selection = iframe.contentDocument.getSelection();
+    if (!selection) return;
+
+    const range = iframe.contentDocument.caretRangeFromPoint(event.clientX, event.clientY);
+    if (!range) return;
+
+    // Get the text node
+    const textNode = range.startContainer;
+    if (textNode.nodeType !== Node.TEXT_NODE) return;
+
+    // Start reading from this position
+    if (!isPlaying) {
+      startSpeech();
+    } else {
+      // If already playing, restart from new position
+      stopSpeech();
+      startSpeech();
+    }
+  }, [isPlaying, stopSpeech, startSpeech]);
 
   const locationChanged = (epubcifi: string) => {
     setLocation(epubcifi);
@@ -84,84 +210,18 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     }, 100);
   };
 
-  const getRendition = (rendition: any) => {
+  const getRendition = (rendition: Rendition) => {
     renditionRef.current = rendition;
     
     // Store the reader instance
     if (rendition.book) {
-      readerRef.current = rendition.book;
+      readerRef.current = rendition;
     }
     
     // Set up content change listener
-    rendition.on('rendered', (section: any) => {
+    rendition.on('rendered', (section: unknown) => {
       console.log('New section rendered:', section);
     });
-  };
-
-  const removeHighlight = () => {
-    if (highlightSpanRef.current) {
-      const parent = highlightSpanRef.current.parentNode;
-      if (parent) {
-        const text = highlightSpanRef.current.textContent || '';
-        const textNode = document.createTextNode(text);
-        parent.replaceChild(textNode, highlightSpanRef.current);
-        highlightSpanRef.current = null;
-      }
-    }
-  };
-
-  const highlightWord = (word: string, charIndex: number) => {
-    removeHighlight();
-
-    try {
-      const iframe = document.querySelector('iframe');
-      if (!iframe?.contentDocument?.body) return;
-
-      const selection = iframe.contentDocument.getSelection();
-      if (!selection) return;
-
-      const range = iframe.contentDocument.createRange();
-      let foundNode: Text | null = null;
-      let foundStart = 0;
-
-      // Find the text node containing our word
-      const walker = document.createTreeWalker(
-        iframe.contentDocument.body,
-        NodeFilter.SHOW_TEXT,
-        null
-      );
-
-      let currentPos = 0;
-      let node: Text | null;
-      
-      while ((node = walker.nextNode() as Text)) {
-        const text = node.textContent || '';
-        if (charIndex >= currentPos && charIndex < currentPos + text.length) {
-          foundNode = node;
-          foundStart = charIndex - currentPos;
-          break;
-        }
-        currentPos += text.length;
-      }
-
-      if (foundNode) {
-        try {
-          range.setStart(foundNode, foundStart);
-          range.setEnd(foundNode, foundStart + word.length);
-
-          const span = iframe.contentDocument.createElement('span');
-          span.style.backgroundColor = '#ffeb3b';
-          
-          
-          range.surroundContents(span);
-          highlightSpanRef.current = span;
-        } catch (e) {
-          console.error('Error setting range:', e);
-        }
-      }
-    } catch (e) {
-      console.error('Error highlighting word:', e);
-    }
   };
 
   const getCurrentPageText = async (): Promise<string> => {
@@ -184,148 +244,6 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     }
   };
 
-  const stopSpeech = () => {
-    if (speechRef.current) {
-      // Store the current position when manually paused
-      if (isManuallyPaused.current) {
-        setPausedPosition(lastWordIndexRef.current);
-      }
-      
-      speechRef.current.onend = null;
-      speechRef.current.onboundary = null;
-      speechRef.current.onerror = null;
-    }
-    window.speechSynthesis.cancel();
-    removeHighlight();
-    setIsPlaying(false);
-  };
-
-  const handleTextClick = (event: MouseEvent) => {
-    const iframe = document.querySelector('iframe');
-    if (!iframe?.contentDocument?.body) return;
-
-    const selection = iframe.contentDocument.getSelection();
-    if (!selection) return;
-
-    const range = iframe.contentDocument.caretRangeFromPoint(event.clientX, event.clientY);
-    if (!range) return;
-
-    // Get the text node and its position
-    const textNode = range.startContainer;
-    if (textNode.nodeType !== Node.TEXT_NODE) return;
-
-    // Calculate the position in the full text
-    let position = 0;
-    const walker = document.createTreeWalker(
-      iframe.contentDocument.body,
-      NodeFilter.SHOW_TEXT,
-      null
-    );
-
-    let node: Text | null;
-    while ((node = walker.nextNode() as Text)) {
-      if (node === textNode) {
-        position += range.startOffset;
-        break;
-      }
-      position += node.length;
-    }
-
-    // Start reading from this position
-    setPausedPosition(position);
-    if (!isPlaying) {
-      startSpeech();
-    } else {
-      // If already playing, restart from new position
-      stopSpeech();
-      startSpeech();
-    }
-  };
-
-  const startSpeech = async () => {
-    const text = await getCurrentPageText();
-    if (!text) return;
-
-    // Stop any existing speech
-    stopSpeech();
-
-    // Reset the manual pause flag
-    isManuallyPaused.current = false;
-
-    // Create new utterance
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Set the selected voice
-    if (selectedVoice) {
-      utterance.voice = selectedVoice.voice;
-    }
-    
-    utterance.rate = speechRate;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-
-    // If we have a paused position, start from there
-    if (pausedPosition > 0) {
-      utterance.text = text.substring(pausedPosition);
-      currentCharIndexRef.current = pausedPosition;
-      lastWordIndexRef.current = pausedPosition;
-      setPausedPosition(0); // Reset the paused position
-    }
-
-    // Handle word boundaries for highlighting
-    utterance.onboundary = (event) => {
-      if (event.name === 'word') {
-        const charIndex = event.charIndex + currentCharIndexRef.current;
-        const wordLength = event.charLength || 0;
-        const word = text.substr(charIndex, wordLength);
-        
-        if (word.trim()) {
-          highlightWord(word, charIndex);
-          lastWordIndexRef.current = charIndex;
-        }
-      }
-    };
-
-    // Handle speech end
-    utterance.onend = () => {
-      removeHighlight();
-      // Only proceed if we're still in playing state and not manually paused
-      if (isPlaying && !isManuallyPaused.current && renditionRef.current) {
-        // Try to move to next page
-        renditionRef.current.next().then((result: boolean) => {
-          if (!result) {
-            // If no next page, stop playing
-            setIsPlaying(false);
-          }
-        });
-      }
-    };
-
-    // Handle errors
-    utterance.onerror = (event) => {
-      // Only log and handle non-interrupted errors
-      if (event.error !== 'interrupted' || !isManuallyPaused.current) {
-        console.error('Speech error:', event);
-        removeHighlight();
-        setIsPlaying(false);
-      }
-    };
-
-    speechRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-    setIsPlaying(true);
-  };
-
-  const toggleSpeech = () => {
-    if (isPlaying) {
-      isManuallyPaused.current = true;
-      stopSpeech();
-    } else {
-      startSpeech();
-    }
-  };
-
-  // Handle speech rate change
   const handleRateChange = (newRate: number) => {
     setSpeechRate(newRate);
     if (isPlaying) {
@@ -341,6 +259,32 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
       iframe.contentDocument.documentElement.scrollTop = 0;
     }
   };
+
+  useEffect(() => {
+    const iframe = document.querySelector('iframe');
+    if (iframe?.contentDocument?.body) {
+      iframe.contentDocument.body.addEventListener('click', handleTextClick);
+    }
+
+    return () => {
+      if (iframe?.contentDocument?.body) {
+        iframe.contentDocument.body.removeEventListener('click', handleTextClick);
+      }
+    };
+  }, [handleTextClick]);
+
+  // Handle play/pause keyboard shortcut
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.code === 'Space' && event.ctrlKey) {
+        event.preventDefault();
+        toggleSpeech();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [toggleSpeech]);
 
   useEffect(() => {
     if (!url) return;
@@ -370,37 +314,10 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
 
     loadEpub();
 
-    // Cleanup speech synthesis when component unmounts
     return () => {
       stopSpeech();
     };
-  }, [url, onTextExtracted]);
-
-  // Handle play/pause keyboard shortcut
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.code === 'Space' && event.ctrlKey) {
-        event.preventDefault();
-        toggleSpeech();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [isPlaying]);
-
-  useEffect(() => {
-    const iframe = document.querySelector('iframe');
-    if (iframe?.contentDocument?.body) {
-      iframe.contentDocument.body.addEventListener('click', handleTextClick);
-    }
-
-    return () => {
-      if (iframe?.contentDocument?.body) {
-        iframe.contentDocument.body.removeEventListener('click', handleTextClick);
-      }
-    };
-  }, [isPlaying]);
+  }, [url, onTextExtracted, stopSpeech]);
 
   useEffect(() => {
     const addReaderStyles = () => {
