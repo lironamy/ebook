@@ -11,6 +11,11 @@ interface EpubViewerProps {
   onTextExtracted?: (text: string) => void;
 }
 
+interface Voice {
+  name: string;
+  voice: SpeechSynthesisVoice;
+}
+
 export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
   const [location, setLocation] = useState<string | number>(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,6 +23,8 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
   const [epubData, setEpubData] = useState<ArrayBuffer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speechRate, setSpeechRate] = useState(1.0);
+  const [availableVoices, setAvailableVoices] = useState<Voice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<Voice | null>(null);
   const currentCharIndexRef = useRef<number>(0);
   const lastWordIndexRef = useRef<number>(0);
   const renditionRef = useRef<Rendition | undefined>(undefined);
@@ -52,12 +59,15 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     setIsPlaying(false);
   }, [removeHighlight]);
 
-  const highlightCurrentWord = useCallback((text: string, charIndex: number) => {
+  const highlightCurrentWord = useCallback((text: string, charIndex: number, wordLength: number) => {
     removeHighlight();
 
     try {
       const iframe = document.querySelector('iframe');
       if (!iframe?.contentDocument?.body) return;
+
+      const doc = iframe.contentDocument;
+      const body = doc.body;
 
       // Find the text node containing this character index
       let currentPos = 0;
@@ -65,7 +75,7 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
       let foundStart = 0;
 
       const walker = document.createTreeWalker(
-        iframe.contentDocument.body,
+        body,
         NodeFilter.SHOW_TEXT,
         null
       );
@@ -83,16 +93,24 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
       }
 
       if (foundNode) {
-        const range = iframe.contentDocument.createRange();
+        const range = doc.createRange();
         range.setStart(foundNode, foundStart);
-        range.setEnd(foundNode, foundStart + 1);
+        range.setEnd(foundNode, foundStart + wordLength);
 
-        const span = iframe.contentDocument.createElement('span');
+        const span = doc.createElement('span');
         span.style.backgroundColor = '#ffeb3b';
         span.style.color = '#000';
+        span.style.transition = 'background-color 0.2s ease-in-out';
         
         range.surroundContents(span);
         highlightSpanRef.current = span;
+
+        // Ensure the highlighted word is visible
+        const rect = span.getBoundingClientRect();
+        const iframeRect = iframe.getBoundingClientRect();
+        if (rect.top < iframeRect.top || rect.bottom > iframeRect.bottom) {
+          span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
       }
     } catch (err) {
       console.error('Error highlighting word:', err);
@@ -105,21 +123,32 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
 
     // Reset manual pause flag when starting new speech
     isManuallyPaused.current = false;
+    currentTextRef.current = text;
 
-    // Create a new utterance
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Create a new utterance starting from the current position
+    const startIndex = currentCharIndexRef.current;
+    const utterance = new SpeechSynthesisUtterance(text.slice(startIndex));
     utterance.rate = speechRate;
 
-    // Set the voice if one is selected
-    if (window.speechSynthesis.getVoices().length > 0) {
-      const ziraVoice = window.speechSynthesis.getVoices().find(voice => 
-        voice.name === 'Microsoft Zira - English (United States)' && 
-        voice.lang === 'en-US'
-      );
-      if (ziraVoice) {
-        utterance.voice = ziraVoice;
-      }
+    // Set the selected voice
+    if (selectedVoice) {
+      utterance.voice = selectedVoice.voice;
     }
+
+    // Handle word boundaries for highlighting
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        const globalCharIndex = startIndex + event.charIndex;
+        const word = text.slice(globalCharIndex).split(/\s+/)[0] || '';
+        
+        // Update indices and highlight with proper word boundaries
+        currentCharIndexRef.current = globalCharIndex;
+        lastWordIndexRef.current = globalCharIndex + word.length;
+        
+        // Highlight the full word
+        highlightCurrentWord(text, globalCharIndex, word.length);
+      }
+    };
 
     // Handle speech end
     utterance.onend = () => {
@@ -131,17 +160,12 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
           // Check if we're at the end of the book
           if (!renditionRef.current) {
             setIsPlaying(false);
+          } else {
+            // Reset character index for new page
+            currentCharIndexRef.current = 0;
+            startSpeech();
           }
         });
-      }
-    };
-
-    // Handle word boundaries for highlighting
-    utterance.onboundary = (event) => {
-      if (event.name === 'word') {
-        currentCharIndexRef.current = event.charIndex;
-        lastWordIndexRef.current = event.charIndex;
-        highlightCurrentWord(text, event.charIndex);
       }
     };
 
@@ -157,7 +181,7 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     speechRef.current = utterance;
     window.speechSynthesis.speak(utterance);
     setIsPlaying(true);
-  }, [speechRate, isPlaying, removeHighlight, highlightCurrentWord]);
+  }, [speechRate, isPlaying, removeHighlight, highlightCurrentWord, selectedVoice]);
 
   const toggleSpeech = useCallback(() => {
     if (isPlaying) {
@@ -170,25 +194,83 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
 
   const handleTextClick = useCallback((event: MouseEvent) => {
     const iframe = document.querySelector('iframe');
-    if (!iframe?.contentDocument?.body) return;
+    if (!iframe?.contentDocument) return;
 
-    const selection = iframe.contentDocument.getSelection();
+    const doc = iframe.contentDocument;
+    const selection = doc.getSelection();
     if (!selection) return;
 
-    const range = iframe.contentDocument.caretRangeFromPoint(event.clientX, event.clientY);
+    const range = doc.caretRangeFromPoint(event.clientX, event.clientY);
     if (!range) return;
 
     // Get the text node
     const textNode = range.startContainer;
     if (textNode.nodeType !== Node.TEXT_NODE) return;
 
-    // Start reading from this position
-    if (!isPlaying) {
+    // Get the full page text
+    getCurrentPageText().then(text => {
+      if (!iframe?.contentDocument?.body) return;
+
+      const body = iframe.contentDocument.body;
+
+      // Calculate the absolute position in the text
+      let absolutePosition = 0;
+      const walker = document.createTreeWalker(
+        body,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+
+      let node: Text | null;
+      let foundClickedNode = false;
+      while ((node = walker.nextNode() as Text)) {
+        if (node === textNode) {
+          absolutePosition += range.startOffset;
+          foundClickedNode = true;
+          break;
+        }
+        absolutePosition += node.textContent?.length || 0;
+      }
+
+      if (!foundClickedNode) return;
+
+      // Find word boundaries
+      let wordStart = absolutePosition;
+      while (wordStart > 0 && !/\s/.test(text[wordStart - 1])) {
+        wordStart--;
+      }
+
+      let wordEnd = absolutePosition;
+      while (wordEnd < text.length && !/\s/.test(text[wordEnd])) {
+        wordEnd++;
+      }
+
+      // Update current position to start of word
+      currentCharIndexRef.current = wordStart;
+      lastWordIndexRef.current = wordEnd;
+
+      // Highlight the word before starting speech
+      const wordLength = wordEnd - wordStart;
+      highlightCurrentWord(text, wordStart, wordLength);
+
+      // Start or restart speech from this position
+      if (isPlaying) {
+        stopSpeech();
+      }
       startSpeech();
-    } else {
-      // If already playing, restart from new position
+    });
+  }, [isPlaying, stopSpeech, startSpeech, highlightCurrentWord]);
+
+  const handleRateChange = useCallback((newRate: number) => {
+    setSpeechRate(newRate);
+    if (isPlaying) {
+      const currentPosition = currentCharIndexRef.current;
       stopSpeech();
-      startSpeech();
+      // Preserve the position and restart with new rate
+      setTimeout(() => {
+        currentCharIndexRef.current = currentPosition;
+        startSpeech();
+      }, 100);
     }
   }, [isPlaying, stopSpeech, startSpeech]);
 
@@ -230,25 +312,18 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     try {
       // Get text from the current page's iframe
       const iframe = document.querySelector('iframe');
-      if (!iframe?.contentDocument?.body) {
-        return '';
-      }
+      if (!iframe?.contentDocument) return '';
+
+      const doc = iframe.contentDocument;
+      const body = doc.body;
 
       // Get all text content
-      const text = iframe.contentDocument.body.textContent || '';
+      const text = body?.textContent || '';
       currentTextRef.current = text;
       return text;
     } catch (err) {
       console.error('Error getting page text:', err);
       return '';
-    }
-  };
-
-  const handleRateChange = (newRate: number) => {
-    setSpeechRate(newRate);
-    if (isPlaying) {
-      // Restart speech with new rate
-      startSpeech();
     }
   };
 
@@ -323,16 +398,19 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     const addReaderStyles = () => {
       const iframe = document.querySelector('iframe');
       if (iframe?.contentDocument?.body) {
+        const doc = iframe.contentDocument;
+        const body = doc.body;
+
         // Add styles to the iframe body
-        iframe.contentDocument.body.style.maxWidth = '65ch';
-        iframe.contentDocument.body.style.margin = '0 auto';
-        iframe.contentDocument.body.style.padding = '2rem';
-        iframe.contentDocument.body.style.fontSize = '1.2rem';
-        iframe.contentDocument.body.style.lineHeight = '1.6';
-        iframe.contentDocument.body.style.overflowX = 'hidden';
+        body.style.maxWidth = '65ch';
+        body.style.margin = '0 auto';
+        body.style.padding = '2rem';
+        body.style.fontSize = '1.2rem';
+        body.style.lineHeight = '1.6';
+        body.style.overflowX = 'hidden';
         
         // Add styles to all paragraphs
-        const paragraphs = iframe.contentDocument.querySelectorAll('p');
+        const paragraphs = doc.querySelectorAll('p');
         paragraphs.forEach(p => {
           p.style.marginBottom = '1rem';
           p.style.textAlign = 'justify';
@@ -356,6 +434,38 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     return () => observer.disconnect();
   }, []);
 
+  // Load available voices
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices()
+        .map(voice => ({
+          name: `${voice.name} (${voice.lang})`,
+          voice: voice
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      setAvailableVoices(voices);
+
+      // Try to select English voice by default
+      const defaultVoice = voices.find(v => 
+        v.voice.lang.startsWith('en-') || 
+        v.voice.name.toLowerCase().includes('english')
+      );
+      
+      if (defaultVoice) {
+        setSelectedVoice(defaultVoice);
+      } else if (voices.length > 0) {
+        setSelectedVoice(voices[0]);
+      }
+    };
+
+    // Chrome loads voices asynchronously
+    if (typeof window !== 'undefined') {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+      loadVoices(); // Initial load
+    }
+  }, []);
+
   if (error) {
     return <div className="text-red-500">Error: {error}</div>;
   }
@@ -367,61 +477,71 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
   return (
     <div className="relative" style={{ height: '100vh', width: '100%' }}>
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 flex gap-4 items-center bg-white/80 p-4 rounded-lg shadow-lg">
-        <button
-          onClick={() => {
-            renditionRef.current?.prev().then(() => {
-              setTimeout(scrollToTop, 100);
-            });
-          }}
-          className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
-          title="Previous Chapter"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6"></polyline>
-          </svg>
-        </button>
-        <button
-          onClick={() => {
-            renditionRef.current?.next().then(() => {
-              setTimeout(scrollToTop, 100);
-            });
-          }}
-          className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
-          title="Next Chapter"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Speed:</label>
-          <input
-            type="range"
-            min="0.5"
-            max="2"
-            step="0.1"
-            value={speechRate}
-            onChange={(e) => handleRateChange(parseFloat(e.target.value))}
-            className="w-24"
-          />
-          <span className="text-sm text-gray-600">{speechRate}x</span>
+        <div className="flex items-center gap-4">
+          <select
+            className="px-2 py-1 rounded border border-gray-300 bg-white text-sm"
+            value={selectedVoice?.name || ''}
+            onChange={(e) => {
+              const voice = availableVoices.find(v => v.name === e.target.value);
+              if (voice) {
+                setSelectedVoice(voice);
+                if (isPlaying) {
+                  // Restart speech with new voice
+                  const currentPosition = currentCharIndexRef.current;
+                  stopSpeech();
+                  setTimeout(() => {
+                    currentCharIndexRef.current = currentPosition;
+                    startSpeech();
+                  }, 100);
+                }
+              }
+            }}
+          >
+            {availableVoices.map(voice => (
+              <option key={voice.name} value={voice.name}>
+                {voice.name}
+              </option>
+            ))}
+          </select>
+          
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Speed:</label>
+            <input
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value={speechRate}
+              onChange={(e) => handleRateChange(parseFloat(e.target.value))}
+              className="w-24"
+            />
+            <span className="text-sm text-gray-600">{speechRate}x</span>
+          </div>
+
+          <button
+            onClick={toggleSpeech}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center gap-2"
+          >
+            {isPlaying ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="6" y="4" width="4" height="16"></rect>
+                  <rect x="14" y="4" width="4" height="16"></rect>
+                </svg>
+                Pause
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                Play
+              </>
+            )}
+          </button>
         </div>
-        <button
-          onClick={toggleSpeech}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center gap-2"
-          title="Press Ctrl+Space to play/pause"
-        >
-          {isPlaying ? (
-            <>
-              <PauseIcon /> Pause
-            </>
-          ) : (
-            <>
-              <PlayIcon /> Play
-            </>
-          )}
-        </button>
       </div>
+      
       <div className="max-w-3xl mx-auto px-16 relative" style={{ height: 'calc(100vh - 100px)' }}>
         <ReactReader
           url={epubData}
