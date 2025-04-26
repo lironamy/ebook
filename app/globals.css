@@ -19,3 +19,52 @@ body {
   background: rgb(var(--background-rgb));
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
+
+.header-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  text-align: center;
+  margin: 0; 
+}
+
+.lead-text1 {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #000;
+}
+
+.title-text {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #9818d3;
+}
+
+.title-textRio {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #125e1c;
+}
+
+.header-text-rio {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.header-text-rio-agatha {
+  display: flex;
+  flex-direction: row;
+  
+}
+

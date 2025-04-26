@@ -76,8 +76,20 @@ export default function Home() {
   return (
     <main className="min-h-screen p-8 overflow-hidden">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8 flex flex-col items-center">
-          <h1 className="text-4xl font-bold mb-6 text-center">Ebook Voice Reader</h1>
+        <div className="flex flex-col items-center">
+          {!book && (
+            <div className="header-text flex flex-col items-center">
+              <p className="lead-text1">Ebook Voice Reader</p>
+              <div className="header-text-rio">
+                <p className="lead-text">Dedicated to all</p>
+                <div className="header-text-rio-agatha">
+                  <b className="title-text">Agatha</b>
+                  <b className="title-textRio">Rio</b>
+                </div>
+                <p className="lead-text">fans!</p>
+              </div>
+            </div>
+          )}
           <div className="flex justify-center">
             <input
               type="file"
