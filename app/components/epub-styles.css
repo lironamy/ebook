@@ -95,3 +95,62 @@ a {
     transform: rotate(360deg);
   }
 }
+
+
+.playBtn {
+  background-color: #1d6916;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.selectVoice {
+  background-color: #ad2fe7;
+  color: #fff;
+  border: none;
+  padding: 7px 10px;
+  border-radius: 5px;
+  margin-right: 10px;
+  width: 150px;
+}
+
+.selectVoice:hover {
+  background-color: #ad2fe7;
+}
+
+.selectVoice:focus {
+  outline: none;
+}
+
+.selectVoice option {
+  background-color: var(--reader-bg);
+  color: var(--reader-text);
+}
+
+.selectVoice option:hover {
+  background-color: #0056b3;
+}
+
+.selectVoice option:focus {
+  outline: none;
+}
+
+.selectVoice option:active {
+  background-color: #0056b3;
+}
+
+.selectVoice option:checked {
+  background-color: #0056b3;
+}
+
+.selectVoice option:checked:hover {
+  background-color: #0056b3;
+} 
+

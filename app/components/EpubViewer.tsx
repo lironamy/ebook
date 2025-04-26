@@ -527,7 +527,7 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
                 }
               }
             }}
-            className="px-3 py-2 rounded bg-gray-700 text-white border border-gray-600"
+            className="selectVoice px-3 py-2 rounded bg-gray-700 text-white border border-gray-600"
           >
             <option value="">Select Voice</option>
             {availableVoices.map((voice) => (
@@ -539,7 +539,7 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
           
           <button
             onClick={toggleSpeech}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+            className="playBtn px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
             {isPlaying ? (
               <>

@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import EpubViewer, { isPlaying, setIsPlaying } from './components/EpubViewer';
+import EpubViewer from './components/EpubViewer';
 import TextToSpeech from './components/TextToSpeech';
 
 export default function Home() {
   const [book, setBook] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -135,19 +136,11 @@ export default function Home() {
                 onTextExtracted={handleTextExtracted}
               />
               {currentText && (
-                <>
-                  <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                  >
-                    {isPlaying ? 'Pause' : 'Play'}
-                  </button>
-                  <TextToSpeech
-                    text={currentText}
-                    isPlaying={isPlaying}
-                    onHighlight={handleHighlight}
-                  />
-                </>
+                <TextToSpeech
+                  text={currentText}
+                  isPlaying={isPlaying}
+                  onHighlight={handleHighlight}
+                />
               )}
             </>
           ) : (
