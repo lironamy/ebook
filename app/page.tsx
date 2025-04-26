@@ -6,7 +6,7 @@ import TextToSpeech from './components/TextToSpeech';
 
 export default function Home() {
   const [book, setBook] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
