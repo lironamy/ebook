@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import EpubViewer from './components/EpubViewer';
+import EpubViewer, { isPlaying, setIsPlaying } from './components/EpubViewer';
 import TextToSpeech from './components/TextToSpeech';
 
 export default function Home() {
   const [book, setBook] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,10 +47,6 @@ export default function Home() {
     }
   };
 
-  const togglePlayPause = () => {
-    setIsPlaying(!isPlaying);
-  };
-
   const handleTextExtracted = useCallback((text: string) => {
     setCurrentText(text);
   }, []);
@@ -78,11 +73,11 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-screen p-8">
+    <main className="min-h-screen p-8 overflow-hidden">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-4">AI Ebook Reader</h1>
-          <div className="flex gap-4 items-center">
+        <div className="mb-8 flex flex-col items-center">
+          <h1 className="text-4xl font-bold mb-6 text-center">Ebook Voice Reader</h1>
+          <div className="flex justify-center">
             <input
               type="file"
               accept=".epub"
@@ -93,21 +88,38 @@ export default function Home() {
             />
             <label
               htmlFor="file-upload"
-              className={`${
-                isLoading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'
-              } text-white px-4 py-2 rounded cursor-pointer`}
+              className={`
+                flex items-center justify-center gap-3 
+                ${isLoading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700'
+                }
+                text-white font-semibold
+                px-8 py-4 rounded-xl
+                shadow-lg hover:shadow-xl
+                transform hover:-translate-y-0.5
+                transition-all duration-200
+                text-lg
+                min-w-[200px]
+              `}
             >
-              {isLoading ? 'Uploading...' : 'Upload Ebook'}
+              {isLoading ? (
+                <>
+                  <svg className="svgIcon animate-spin h-2 w-2" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Uploading...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="svgIcon w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  <span>Upload Ebook</span>
+                </>
+              )}
             </label>
-            <button
-              onClick={togglePlayPause}
-              className={`${
-                isPlaying ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
-              } text-white px-4 py-2 rounded`}
-              disabled={!book || isLoading}
-            >
-              {isPlaying ? 'Pause' : 'Play'}
-            </button>
           </div>
         </div>
 
@@ -123,11 +135,19 @@ export default function Home() {
                 onTextExtracted={handleTextExtracted}
               />
               {currentText && (
-                <TextToSpeech
-                  text={currentText}
-                  isPlaying={isPlaying}
-                  onHighlight={handleHighlight}
-                />
+                <>
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    {isPlaying ? 'Pause' : 'Play'}
+                  </button>
+                  <TextToSpeech
+                    text={currentText}
+                    isPlaying={isPlaying}
+                    onHighlight={handleHighlight}
+                  />
+                </>
               )}
             </>
           ) : (

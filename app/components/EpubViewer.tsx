@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { ReactReader } from 'react-reader';
+import { ReactReader, ReactReaderStyle, type IReactReaderStyle } from 'react-reader';
 import { extractEpubFromBlob } from '../utils/epub';
 import './epub-styles.css';
 import type { Rendition } from 'epubjs';
@@ -16,13 +16,60 @@ interface Voice {
   voice: SpeechSynthesisVoice;
 }
 
+const darkReaderTheme: IReactReaderStyle = {
+  ...ReactReaderStyle,
+  arrow: {
+    ...ReactReaderStyle.arrow,
+    color: 'white',
+  },
+  arrowHover: {
+    ...ReactReaderStyle.arrowHover,
+    color: '#ccc',
+  },
+  readerArea: {
+    ...ReactReaderStyle.readerArea,
+    backgroundColor: '#000',
+    transition: undefined,
+  },
+  titleArea: {
+    ...ReactReaderStyle.titleArea,
+    color: '#ccc',
+  },
+  tocArea: {
+    ...ReactReaderStyle.tocArea,
+    background: '#111',
+  },
+  tocButtonExpanded: {
+    ...ReactReaderStyle.tocButtonExpanded,
+    background: '#222',
+  },
+  tocButtonBar: {
+    ...ReactReaderStyle.tocButtonBar,
+    background: '#fff',
+  },
+  tocButton: {
+    ...ReactReaderStyle.tocButton,
+    color: 'white',
+  },
+};
+
+function updateTheme(rendition: Rendition) {
+  const themes = rendition.themes;
+  themes.override('color', '#fff');
+  themes.override('background', '#000');
+}
+
+export let isPlaying = false;
+export const setIsPlaying = (value: boolean) => {
+  isPlaying = value;
+};
+
 export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
   const [location, setLocation] = useState<string | number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [epubData, setEpubData] = useState<ArrayBuffer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speechRate, setSpeechRate] = useState(1.0);
   const [availableVoices, setAvailableVoices] = useState<Voice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<Voice | null>(null);
   const currentCharIndexRef = useRef<number>(0);
@@ -94,8 +141,13 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
 
       if (foundNode) {
         const range = doc.createRange();
-        range.setStart(foundNode, foundStart);
-        range.setEnd(foundNode, foundStart + wordLength);
+        const nodeLength = foundNode.length;
+        // Ensure we don't exceed the node's length
+        const safeStart = Math.min(foundStart, nodeLength);
+        const safeEnd = Math.min(foundStart + wordLength, nodeLength);
+        
+        range.setStart(foundNode, safeStart);
+        range.setEnd(foundNode, safeEnd);
 
         const span = doc.createElement('span');
         span.style.backgroundColor = '#ffeb3b';
@@ -128,7 +180,7 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     // Create a new utterance starting from the current position
     const startIndex = currentCharIndexRef.current;
     const utterance = new SpeechSynthesisUtterance(text.slice(startIndex));
-    utterance.rate = speechRate;
+    utterance.rate = 1;
 
     // Set the selected voice
     if (selectedVoice) {
@@ -181,7 +233,7 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     speechRef.current = utterance;
     window.speechSynthesis.speak(utterance);
     setIsPlaying(true);
-  }, [speechRate, isPlaying, removeHighlight, highlightCurrentWord, selectedVoice]);
+  }, [highlightCurrentWord, isPlaying, removeHighlight, selectedVoice]);
 
   const toggleSpeech = useCallback(() => {
     if (isPlaying) {
@@ -261,18 +313,7 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     });
   }, [isPlaying, stopSpeech, startSpeech, highlightCurrentWord]);
 
-  const handleRateChange = useCallback((newRate: number) => {
-    setSpeechRate(newRate);
-    if (isPlaying) {
-      const currentPosition = currentCharIndexRef.current;
-      stopSpeech();
-      // Preserve the position and restart with new rate
-      setTimeout(() => {
-        currentCharIndexRef.current = currentPosition;
-        startSpeech();
-      }, 100);
-    }
-  }, [isPlaying, stopSpeech, startSpeech]);
+
 
   const locationChanged = (epubcifi: string) => {
     setLocation(epubcifi);
@@ -292,7 +333,7 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     }, 100);
   };
 
-  const getRendition = (rendition: Rendition) => {
+  const getRendition = useCallback((rendition: Rendition) => {
     renditionRef.current = rendition;
     
     // Store the reader instance
@@ -304,7 +345,8 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
     rendition.on('rendered', (section: unknown) => {
       console.log('New section rendered:', section);
     });
-  };
+    updateTheme(rendition);
+  }, []);
 
   const getCurrentPageText = async (): Promise<string> => {
     if (!renditionRef.current) return '';
@@ -430,6 +472,7 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
   useEffect(() => {
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices()
+        .filter(voice => voice.lang === 'en-US')
         .map(voice => ({
           name: `${voice.name} (${voice.lang})`,
           voice: voice
@@ -438,15 +481,8 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
 
       setAvailableVoices(voices);
 
-      // Try to select English voice by default
-      const defaultVoice = voices.find(v => 
-        v.voice.lang.startsWith('en-') || 
-        v.voice.name.toLowerCase().includes('english')
-      );
-      
-      if (defaultVoice) {
-        setSelectedVoice(defaultVoice);
-      } else if (voices.length > 0) {
+      // Select the first en-US voice by default
+      if (voices.length > 0) {
         setSelectedVoice(voices[0]);
       }
     };
@@ -463,15 +499,18 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
   }
 
   if (isLoading || !epubData) {
-    return <div>Loading...</div>;
+    return (
+      <div className="loader-container">
+        <div className="loader"></div>
+      </div>
+    );
   }
 
   return (
-    <div className="relative" style={{ height: '100vh', width: '100%' }}>
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 flex gap-4 items-center bg-white/80 p-4 rounded-lg shadow-lg">
+    <div className="relative overflow-hidden" style={{ height: '100vh', width: '100%', background: '#000' }}>
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 flex gap-4 items-center bg-gray-800/90 p-4 rounded-lg shadow-lg">
         <div className="flex items-center gap-4">
           <select
-            className="px-2 py-1 rounded border border-gray-300 bg-white text-sm"
             value={selectedVoice?.name || ''}
             onChange={(e) => {
               const voice = availableVoices.find(v => v.name === e.target.value);
@@ -488,31 +527,19 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
                 }
               }
             }}
+            className="px-3 py-2 rounded bg-gray-700 text-white border border-gray-600"
           >
-            {availableVoices.map(voice => (
+            <option value="">Select Voice</option>
+            {availableVoices.map((voice) => (
               <option key={voice.name} value={voice.name}>
                 {voice.name}
               </option>
             ))}
           </select>
           
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Speed:</label>
-            <input
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={speechRate}
-              onChange={(e) => handleRateChange(parseFloat(e.target.value))}
-              className="w-24"
-            />
-            <span className="text-sm text-gray-600">{speechRate}x</span>
-          </div>
-
           <button
             onClick={toggleSpeech}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
             {isPlaying ? (
               <>
@@ -534,20 +561,26 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
         </div>
       </div>
       
-      <div className="max-w-3xl mx-auto px-16 relative" style={{ height: 'calc(100vh - 100px)' }}>
+      <div className="max-w-3xl mx-auto px-16 relative overflow-hidden" style={{ height: 'calc(100vh - 100px)' }}>
         <ReactReader
           url={epubData}
           location={location}
           locationChanged={locationChanged}
           getRendition={getRendition}
-          loadingView={<div>Loading...</div>}
+          loadingView={<div className="text-white">Loading...</div>}
           epubOptions={{
             flow: "scrolled-doc",
             allowScriptedContent: true
+          }}
+          readerStyles={{
+            ...darkReaderTheme,
+            readerArea: {
+              ...darkReaderTheme.readerArea,
+              overflow: 'hidden'
+            }
           }}
         />
       </div>
     </div>
   );
 }
-
