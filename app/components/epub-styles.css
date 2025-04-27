@@ -1,15 +1,15 @@
 /* Styles for the epub reader iframe content */
 :root {
   --reader-bg: #1a1a1a;
-  --reader-text: #e0e0e0;
+  --reader-text: rgb(171, 171, 171);
   --reader-line-height: 1.6;
   --reader-font-size: 1.2rem;
 }
 
 /* Apply dark mode styles */
 html, body {
-  background-color: var(--reader-bg) !important;
-  color: var(--reader-text) !important;
+  background-color: #1f2937 !important;
+  color: rgb(171, 171, 171) !important;
   overflow: hidden !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -26,7 +26,7 @@ html, body {
 }
 
 p, h1, h2, h3, h4, h5, h6, span, div {
-  color: var(--reader-text) !important;
+  color: rgb(171, 171, 171) !important;
 }
 
 /* Ensure content container is properly contained */
@@ -36,7 +36,12 @@ p, h1, h2, h3, h4, h5, h6, span, div {
 }
 
 a {
-  color: #66b3ff !important;
+  color: rgb(216, 180, 254) !important; /* A nice purple color (tailwind purple-300) */
+  text-decoration: underline !important;
+}
+
+a:hover {
+  color: rgb(192, 132, 252) !important; /* slightly darker purple on hover (purple-400) */
 }
 
 /* Hide horizontal scrollbar */
@@ -153,4 +158,3 @@ a {
 .selectVoice option:checked:hover {
   background-color: #0056b3;
 } 
-

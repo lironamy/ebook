@@ -20,43 +20,43 @@ const darkReaderTheme: IReactReaderStyle = {
   ...ReactReaderStyle,
   arrow: {
     ...ReactReaderStyle.arrow,
-    color: 'white',
+    color: 'rgb(171, 171, 171)',
   },
   arrowHover: {
     ...ReactReaderStyle.arrowHover,
-    color: '#ccc',
+    color: 'rgb(150, 150, 150)',
   },
   readerArea: {
     ...ReactReaderStyle.readerArea,
-    backgroundColor: '#000',
+    backgroundColor: '#1f2937',
     transition: undefined,
   },
   titleArea: {
     ...ReactReaderStyle.titleArea,
-    color: '#ccc',
+    color: 'rgb(222, 222, 222)',
   },
   tocArea: {
     ...ReactReaderStyle.tocArea,
-    background: '#111',
+    background: '#1f2937',
   },
   tocButtonExpanded: {
     ...ReactReaderStyle.tocButtonExpanded,
-    background: '#222',
+    background: '#374151',
   },
   tocButtonBar: {
     ...ReactReaderStyle.tocButtonBar,
-    background: '#fff',
+    background: 'rgb(171, 171, 171)',
   },
   tocButton: {
     ...ReactReaderStyle.tocButton,
-    color: 'white',
+    color: 'rgb(171, 171, 171)',
   },
 };
 
 function updateTheme(rendition: Rendition) {
   const themes = rendition.themes;
-  themes.override('color', '#fff');
-  themes.override('background', '#000');
+  themes.override('color', 'rgb(171, 171, 171)');
+  themes.override('background', '#1f2937');
 }
 
 export let isPlaying = false;
@@ -507,7 +507,7 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
   }
 
   return (
-    <div className="relative overflow-hidden" style={{ height: '100vh', width: '100%', background: '#000' }}>
+    <div className="relative overflow-hidden" style={{ height: '100vh', width: '100%', background: '#1f2937' }}>
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 flex gap-4 items-center bg-gray-800/90 p-4 rounded-lg shadow-lg">
         <div className="flex items-center gap-4">
           <select
