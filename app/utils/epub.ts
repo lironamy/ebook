@@ -4,49 +4,64 @@ export async function extractEpubFromBlob(blobUrl: string): Promise<{ success: b
   try {
     console.log('[extractEpubFromBlob] Starting extraction for:', blobUrl);
     
-    // Fetch the blob
     const response = await fetch(blobUrl);
     const blob = await response.blob();
     
-    // Load and parse the EPUB
     const zip = new JSZip();
     const zipContents = await zip.loadAsync(blob);
     
-    // Extract each file
-    const files = [];
     let extractedText = '';
+
+    // First find the content.opf to get the reading order
+    let contentOpf = '';
     for (const [path, file] of Object.entries(zipContents.files)) {
-      if (!file.dir) {
-        const content = await file.async('string');
-        // Clean the path to ensure consistent format
-        const cleanPath = path.replace(/^\/+/, '');
-        console.log('[extractEpubFromBlob] Extracting file:', cleanPath);
-        files.push({
-          path: cleanPath,
-          content
-        });
-        extractedText += content + '\n';
+      if (path.toLowerCase().endsWith('content.opf')) {
+        contentOpf = await file.async('string');
+        break;
       }
     }
+
+    // Parse content.opf to get the spine order
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(contentOpf, 'application/xml');
+    const spine = doc.querySelector('spine');
+    const itemrefs = spine ? Array.from(spine.querySelectorAll('itemref')) : [];
+    const manifest = doc.querySelector('manifest');
     
-    // Store files via API route
-    const storeResponse = await fetch('/api/epub/store', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        blobUrl,
-        files
-      })
-    });
-    
-    if (!storeResponse.ok) {
-      const error = await storeResponse.json();
-      throw new Error(`Failed to store EPUB contents: ${error.message}`);
+    // Get the reading order
+    const readingOrder = itemrefs.map(itemref => {
+      const idref = itemref.getAttribute('idref');
+      const item = manifest?.querySelector(`item[id="${idref}"]`);
+      return item?.getAttribute('href') || '';
+    }).filter(href => href);
+
+    // Extract chapters in reading order
+    for (const href of readingOrder) {
+      const file = zipContents.files[href];
+      if (!file) continue;
+
+      const content = await file.async('string');
+      
+      // Skip preface and afterword
+      const lowerContent = content.toLowerCase();
+      if (lowerContent.includes('preface') || lowerContent.includes('afterword')) {
+        console.log('[extractEpubFromBlob] Skipping:', href, '(preface/afterword)');
+        continue;
+      }
+
+      console.log('[extractEpubFromBlob] Extracting chapter:', href);
+      
+      // Extract text content from HTML
+      const doc = parser.parseFromString(content, 'text/html');
+      const text = doc.body?.textContent || '';
+      extractedText += text + '\n\n';
     }
     
-    console.log('[extractEpubFromBlob] Successfully stored', files.length, 'files');
+    if (!extractedText) {
+      throw new Error('No valid chapter content found in EPUB');
+    }
+
+    console.log('[extractEpubFromBlob] Successfully extracted chapter content');
     return { success: true, text: extractedText };
   } catch (error) {
     console.error('[extractEpubFromBlob] Error:', error);

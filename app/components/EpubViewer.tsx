@@ -570,7 +570,10 @@ export default function EpubViewer({ url, onTextExtracted }: EpubViewerProps) {
           loadingView={<div className="text-white">Loading...</div>}
           epubOptions={{
             flow: "scrolled-doc",
-            allowScriptedContent: true
+            allowScriptedContent: true,
+            allowPopups: true,
+            width: "100%",
+            height: "100%"
           }}
           readerStyles={{
             ...darkReaderTheme,

@@ -1,0 +1,44 @@
+.footer {
+  margin-top: auto;
+  padding: 2rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.social-links {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.social-link {
+  color: #4b5563;
+  transition: color 0.3s ease;
+}
+
+.social-link:hover.linkedin {
+  color: #0077b5;
+}
+
+.social-link:hover.github {
+  color: #24292e;
+}
+
+.social-link:hover.twitter {
+  color: #000000;
+}
+
+.social-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.copyright {
+  color: #4b5563;
+  font-size: 0.875rem;
+}
